@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishGuard | Email Threat Analysis</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-mark">PG</div>
+      <div class="brand-copy"><strong>PhishGuard</strong><span>EMAIL SECURITY</span></div>
+      <nav><a class="nav-link active" href="{{ url_for('index') }}"><span>▦</span> Dashboard</a><a class="nav-link" href="#analyzer"><span>⌕</span> Email Analyzer</a><a class="nav-link" href="#history"><span>◷</span> Analysis History</a><a class="nav-link" href="#performance"><span>▥</span> Model Performance</a></nav>
+      <div class="sidebar-bottom"><div class="status-dot"></div><span>Local ML engine</span><small>Private · Runs on this computer</small></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div><p class="eyebrow">SECURITY WORKSPACE</p><h1>Email Threat Dashboard</h1></div><div class="model-chip"><span class="pulse"></span> Logistic Regression <b>ACTIVE</b></div></header>
+      <section class="welcome-row"><div><h2>Analyze suspicious emails</h2><p>Inspect email text with your trained machine-learning model.</p></div><div class="accuracy-pill"><strong>99.17%</strong><span>Test accuracy</span></div></section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
+      {% endwith %}
+
+      {% if result %}
+      <section class="result-card {{ 'spam-result' if result.prediction == 'Spam' else 'safe-result' }}">
+        <div class="result-icon">{{ '!' if result.prediction == 'Spam' else '✓' }}</div>
+        <div class="result-main"><span class="eyebrow">ANALYSIS RESULT</span><h2>{{ result.prediction }}</h2><p>{{ 'This email was classified as spam by the model. Treat links and requests for information with caution.' if result.prediction == 'Spam' else 'This email was classified as legitimate by the model. Still verify unexpected requests independently.' }}</p></div>
+        <div class="result-score"><strong>{{ '%.1f'|format(result.spam_probability) }}%</strong><span>Spam probability</span><small class="risk {{ result.risk_level|lower }}">{{ result.risk_level }} risk score</small></div>
+      </section>
+      {% endif %}
+
+      <section class="stats-grid">
+        <article class="stat-card"><div class="stat-label">TOTAL ANALYSES <span>↗</span></div><strong>{{ stats.total }}</strong><small>Checks performed on this device</small></article>
+        <article class="stat-card"><div class="stat-label">SPAM DETECTED <span class="red-icon">!</span></div><strong>{{ stats.spam }}</strong><small>Classified as spam</small></article>
+        <article class="stat-card"><div class="stat-label">LEGITIMATE <span class="green-icon">✓</span></div><strong>{{ stats.legitimate }}</strong><small>Classified as legitimate</small></article>
+        <article class="stat-card"><div class="stat-label">MODEL ACCURACY <span>◎</span></div><strong>99.17%</strong><small>On the held-out test set</small></article>
+      </section>
+
+      <section class="content-grid" id="analyzer">
+        <article class="panel analyzer-panel">
+          <div class="panel-heading"><div><span class="eyebrow">LIVE SCANNING</span><h2>Email Analyzer</h2><p>Paste the subject and message content below.</p></div><div class="scan-symbol">⌁</div></div>
+          <form method="POST" action="{{ url_for('analyze') }}" id="email-form">
+            <label for="subject">Email subject <span>OPTIONAL</span></label><input id="subject" name="subject" maxlength="250" placeholder="e.g. Urgent: Verify your account">
+            <label for="sender">Sender address <span>OPTIONAL</span></label><input id="sender" name="sender" maxlength="250" placeholder="e.g. support@example.com">
+            <div class="label-line"><label for="body">Email message <span class="required">SUBJECT OR MESSAGE REQUIRED</span></label><span id="char-count">0 / 50,000</span></div>
+            <textarea id="body" name="body" maxlength="50000" rows="9" placeholder="Paste the email body here. You can include links, requests, and other email text..."></textarea>
+            <div class="form-footer"><span>🔒 Text is analyzed locally and is not sent to an external service.</span><button type="submit"><span>⌕</span> Analyze email</button></div>
+          </form>
+        </article>
+
+        <article class="panel guide-panel"><div class="panel-heading"><div><span class="eyebrow">HOW IT WORKS</span><h2>Detection pipeline</h2><p>Your trained model workflow</p></div></div>
+          <div class="pipeline"><div class="pipeline-step"><div class="step-number">01</div><div><strong>Text preprocessing</strong><p>Normalize text and replace URLs, matching the training cleaner.</p></div></div><div class="pipeline-step"><div class="step-number">02</div><div><strong>TF-IDF vectorization</strong><p>Convert the email into features using your saved vocabulary.</p></div></div><div class="pipeline-step"><div class="step-number">03</div><div><strong>Logistic Regression</strong><p>Predict the email class and calculate its spam probability.</p></div></div><div class="pipeline-step"><div class="step-number">04</div><div><strong>Result and history</strong><p>Display the result and save a brief local history record.</p></div></div></div>
+          <div class="model-note"><strong>Selected model</strong><span>Logistic Regression · TF-IDF</span><small>Chosen from your model comparison results.</small></div>
+        </article>
+      </section>
+
+      <section class="panel history-panel" id="history"><div class="section-heading"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Analysis history</h2></div><span class="subtle-tag">Stored locally</span></div>
+        {% if history %}<div class="table-wrap"><table><thead><tr><th>SUBJECT</th><th>SENDER</th><th>RESULT</th><th>SPAM PROBABILITY</th><th>RISK</th><th>TIME</th></tr></thead><tbody>{% for item in history %}<tr><td class="subject-cell">{{ item.subject }}</td><td>{{ item.sender }}</td><td><span class="badge {{ 'badge-spam' if item.prediction == 'Spam' else 'badge-safe' }}">{{ item.prediction }}</span></td><td>{{ '%.1f'|format(item.spam_probability) }}%</td><td><span class="risk {{ item.risk_level|lower }}">{{ item.risk_level }}</span></td><td>{{ item.checked_at }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><div>◷</div><strong>No analyses yet</strong><p>Your recent email checks will appear here.</p></div>{% endif %}
+      </section>
+
+      <section class="panel performance-panel" id="performance"><div class="section-heading"><div><span class="eyebrow">MODEL EVALUATION</span><h2>Model performance comparison</h2></div><span class="subtle-tag">Held-out test set</span></div>
+        {% if comparison %}<div class="table-wrap"><table><thead><tr><th>MODEL</th><th>ACCURACY</th><th>PRECISION</th><th>RECALL</th><th>F1-SCORE</th></tr></thead><tbody>{% for row in comparison %}<tr class="{{ 'selected-row' if row['Model'] == 'Logistic Regression' else '' }}"><td class="subject-cell">{{ row['Model'] }} {% if row['Model'] == 'Logistic Regression' %}<span class="selected-label">SELECTED</span>{% endif %}</td><td>{{ '%.2f'|format(row['Accuracy']|float) }}%</td><td>{{ '%.2f'|format(row['Precision']|float) }}%</td><td>{{ '%.2f'|format(row['Recall']|float) }}%</td><td>{{ '%.2f'|format(row['F1-Score']|float) }}%</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">The model_comparison.csv file was not found. Run src/compare_models.py to generate it.</p>{% endif %}
+        <div class="disclaimer">Important: This is a machine-learning screening aid, not a guarantee that an email is safe or malicious. Do not open suspicious links or share passwords based only on this result.</div>
+      </section>
+      <footer>PhishGuard · Academic project · Runs locally on your computer</footer>
+    </main>
+  </div>
+  <script>
+    const bodyInput = document.getElementById('body');
+    const count = document.getElementById('char-count');
+    bodyInput.addEventListener('input', () => { count.textContent = `${bodyInput.value.length.toLocaleString()} / 50,000`; });
+  </script>
+</body></html>
